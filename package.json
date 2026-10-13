@@ -12,6 +12,7 @@
     "test": "node --import tsx --test test/app.test.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "menu": "swift scripts/pdf-to-menu.swift public/document.pdf public/menu",
     "verify": "npm run typecheck && npm run test && npm run build"
   },
   "keywords": [],
