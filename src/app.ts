@@ -1,15 +1,14 @@
 import express from 'express';
+import path from 'node:path';
 
 const app = express();
 
-app.get('/', (_request, response) => {
-  const version = process.env.APP_VERSION ?? 'development';
+// src/ and dist/ both sit one level below the project root.
+app.use(express.static(path.join(import.meta.dirname, '..', 'public')));
 
+app.get('/', (_request, response) => {
   response.type('html').send(`
-    <h1>CI/CD Lab</h1>
-    <h2>Welcome to the CI/CD Lab</h2>
-    <p>The application is running.</p>
-    <p>Version ${version}</p>
+    <iframe src="/document.pdf" title="Document" width="100%" height="800"></iframe>
   `);
 });
 
