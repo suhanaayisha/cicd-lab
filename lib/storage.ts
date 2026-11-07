@@ -7,7 +7,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import type { StorageConfig } from './config.js';
+import { getConfig, type StorageConfig } from './config';
 
 /** Where uploaded menu files live. Keys look like `menus/<menuId>/<random>.pdf`. */
 export interface FileStore {
@@ -114,4 +114,12 @@ export function createFileStore(config: StorageConfig): FileStore {
     case 'memory':
       return new MemoryFileStore();
   }
+}
+
+const globalForStore = globalThis as typeof globalThis & { menuqrStore?: FileStore };
+
+/** The app's file store, created once from the environment. */
+export function getStore(): FileStore {
+  globalForStore.menuqrStore ??= createFileStore(getConfig().storage);
+  return globalForStore.menuqrStore;
 }

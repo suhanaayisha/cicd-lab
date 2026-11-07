@@ -1,0 +1,36 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Creates the MenuQR web service. Values marked `sync: false` are secrets:
+# Render asks for them when the Blueprint is first applied, and they are never stored in this repo.
+
+services:
+  - type: web
+    name: menuqr
+    runtime: node
+    plan: free
+    # Pick the region closest to your MongoDB Atlas cluster.
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    # Render only routes traffic to a new deploy once this returns 200.
+    healthCheckPath: /api/health
+    # Deploy a commit to main only after its GitHub Actions checks pass.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: menus
+      - key: STORAGE_DRIVER
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        value: menuqr-menus
+      # Optional: set PUBLIC_URL in the dashboard once you add a custom domain.
+      # Without it, QR codes use the address the app is reached at (https://menuqr.onrender.com).

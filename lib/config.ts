@@ -10,7 +10,6 @@ export type StorageConfig =
     };
 
 export interface Config {
-  port: number;
   appVersion: string;
   /** Public base URL used in QR codes, e.g. https://menus.example.com. Derived from the request when unset. */
   publicUrl: string | undefined;
@@ -19,7 +18,9 @@ export interface Config {
   storage: StorageConfig;
 }
 
-function required(env: NodeJS.ProcessEnv, name: string): string {
+type Env = Record<string, string | undefined>;
+
+function required(env: Env, name: string): string {
   const value = env[name];
   if (!value) {
     throw new Error(`Missing required environment variable ${name}`);
@@ -27,7 +28,7 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function loadConfig(env: Env = process.env): Config {
   const driver = env.STORAGE_DRIVER ?? 'local';
   let storage: StorageConfig;
 
@@ -48,7 +49,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
 
   return {
-    port: Number.parseInt(env.PORT ?? '3000', 10),
     // On Render, fall back to the deployed commit so /api/version shows exactly what is live.
     appVersion: env.APP_VERSION ?? env.RENDER_GIT_COMMIT?.slice(0, 7) ?? 'development',
     publicUrl: env.PUBLIC_URL?.replace(/\/+$/, '') || undefined,
@@ -56,4 +56,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     mongodbDb: env.MONGODB_DB ?? 'menus',
     storage,
   };
+}
+
+let cached: Config | undefined;
+
+/** The app's configuration, read from the environment once. */
+export function getConfig(): Config {
+  cached ??= loadConfig();
+  return cached;
 }

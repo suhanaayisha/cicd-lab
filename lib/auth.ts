@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
-import type { NextFunction, Request, Response } from 'express';
-import type { Collections, User } from './db.js';
+import { ObjectId } from 'mongodb';
+import { isDuplicateKeyError, type Collections, type User } from './db';
 
 const scrypt = promisify(crypto.scrypt) as (
   password: string,
@@ -11,13 +11,12 @@ const scrypt = promisify(crypto.scrypt) as (
 
 const KEY_LENGTH = 64;
 export const SESSION_COOKIE = 'sid';
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-declare module 'express-serve-static-core' {
-  interface Request {
-    user?: User;
-  }
-}
+export type AuthResult = { ok: true; user: User } | { ok: false; error: string };
+
+// ---------- Passwords ----------
 
 // Passwords are stored as `scrypt$<salt>$<hash>` (base64), never in plain text.
 export async function hashPassword(password: string): Promise<string> {
@@ -34,84 +33,78 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return crypto.timingSafeEqual(actual, expected);
 }
 
+// ---------- Accounts ----------
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export async function signUp(
+  collections: Collections,
+  input: { email: string; password: string; confirmPassword: string },
+): Promise<AuthResult> {
+  const email = normalizeEmail(input.email);
+  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+    return { ok: false, error: 'Enter a valid email address.' };
+  }
+  if (input.password.length < 8 || input.password.length > 200) {
+    return { ok: false, error: 'Password must be 8–200 characters.' };
+  }
+  if (input.password !== input.confirmPassword) {
+    return { ok: false, error: 'Passwords do not match.' };
+  }
+
+  const user: User = {
+    _id: new ObjectId(),
+    email,
+    passwordHash: await hashPassword(input.password),
+    createdAt: new Date(),
+  };
+  try {
+    await collections.users.insertOne(user);
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return { ok: false, error: 'An account with this email already exists. Try logging in.' };
+    }
+    throw error;
+  }
+  return { ok: true, user };
+}
+
+export async function logIn(
+  collections: Collections,
+  input: { email: string; password: string },
+): Promise<AuthResult> {
+  const user = await collections.users.findOne({ email: normalizeEmail(input.email) });
+  if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+    return { ok: false, error: 'Incorrect email or password.' };
+  }
+  return { ok: true, user };
+}
+
+// ---------- Sessions ----------
+
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-function parseCookies(header: string | undefined): Record<string, string> {
-  const cookies: Record<string, string> = {};
-  for (const part of header?.split(';') ?? []) {
-    const index = part.indexOf('=');
-    if (index === -1) continue;
-    const name = part.slice(0, index).trim();
-    try {
-      cookies[name] = decodeURIComponent(part.slice(index + 1).trim());
-    } catch {
-      // Ignore malformed cookie values.
-    }
-  }
-  return cookies;
+/** Creates a session and returns the token to put in the cookie. Only its hash is stored. */
+export async function createSession(collections: Collections, userId: ObjectId) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  await collections.sessions.insertOne({ _id: hashToken(token), userId, expiresAt });
+  return { token, expiresAt };
 }
 
-export function createAuth(collections: Collections) {
-  async function startSession(request: Request, response: Response, user: User) {
-    const token = crypto.randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-    await collections.sessions.insertOne({ _id: hashToken(token), userId: user._id, expiresAt });
-    response.cookie(SESSION_COOKIE, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: request.secure,
-      expires: expiresAt,
-      path: '/',
-    });
-  }
-
-  async function endSession(request: Request, response: Response) {
-    const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
-    if (token) {
-      await collections.sessions.deleteOne({ _id: hashToken(token) });
-    }
-    response.clearCookie(SESSION_COOKIE, { path: '/' });
-  }
-
-  /** Attaches `request.user` when the request carries a valid session cookie. */
-  async function loadUser(request: Request, _response: Response, next: NextFunction) {
-    const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
-    if (token) {
-      const session = await collections.sessions.findOne({
-        _id: hashToken(token),
-        expiresAt: { $gt: new Date() },
-      });
-      if (session) {
-        request.user = (await collections.users.findOne({ _id: session.userId })) ?? undefined;
-      }
-    }
-    next();
-  }
-
-  function requireUser(request: Request, response: Response, next: NextFunction) {
-    if (!request.user) {
-      response.redirect(303, '/login');
-      return;
-    }
-    next();
-  }
-
-  return { startSession, endSession, loadUser, requireUser };
+export async function findUserBySession(collections: Collections, token: string): Promise<User | null> {
+  const session = await collections.sessions.findOne({
+    _id: hashToken(token),
+    expiresAt: { $gt: new Date() },
+  });
+  if (!session) return null;
+  return collections.users.findOne({ _id: session.userId });
 }
 
-/**
- * Rejects form posts sent from other websites. Together with SameSite=Lax
- * session cookies this protects against cross-site request forgery.
- */
-export function rejectCrossOriginPosts(request: Request, response: Response, next: NextFunction) {
-  if (request.method === 'POST') {
-    const origin = request.get('origin');
-    if (origin && origin !== `${request.protocol}://${request.get('host')}`) {
-      response.status(403).type('text').send('Cross-origin request blocked');
-      return;
-    }
-  }
-  next();
+export async function deleteSession(collections: Collections, token: string): Promise<void> {
+  await collections.sessions.deleteOne({ _id: hashToken(token) });
 }

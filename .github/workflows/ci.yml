@@ -17,6 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # A real MongoDB for the tests. Each test run uses its own throwaway database.
+    services:
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_MONGODB_URI: mongodb://localhost:27017
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

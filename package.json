@@ -1,30 +1,38 @@
 {
   "name": "cicd-lab",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Upload a restaurant menu PDF and get a mobile-friendly menu page and QR code",
   "engines": {
     "node": "24.x"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/app.test.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "menu": "swift scripts/pdf-to-menu.swift public/document.pdf public/menu",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "dev": "next dev",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "build": "next build",
+    "start": "next start",
+    "verify": "npm run typecheck && npm run build && npm run test",
+    "db:start": "docker run -d --name cicd-lab-mongo -p 27017:27017 -v cicd-lab-mongo:/data/db mongo:8",
+    "db:stop": "docker stop cicd-lab-mongo && docker rm cicd-lab-mongo"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "express": "^5.2.1"
+    "@aws-sdk/client-s3": "^3.1164.0",
+    "mongodb": "^7.8.0",
+    "next": "^16.4.5",
+    "pdfjs-dist": "^6.5.438",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
     "@types/node": "^24.13.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
