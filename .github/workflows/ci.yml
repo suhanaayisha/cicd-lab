@@ -18,9 +18,11 @@ jobs:
     timeout-minutes: 10
 
     # A real MongoDB for the tests. Each test run uses its own throwaway database.
+    # Pinned to 7: MongoDB 8.x refuses to start on Linux kernel 6.19+ (used by
+    # ubuntu-latest runners). See https://jira.mongodb.org/browse/SERVER-121912
     services:
       mongodb:
-        image: mongo:8
+        image: mongo:7
         ports:
           - 27017:27017
         options: >-

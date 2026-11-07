@@ -46,7 +46,7 @@ export function versionedPdfPath(menu: Pick<Menu, 'slug' | 'updatedAt'>): string
 }
 
 export function listMenus({ collections }: MenuDeps, ownerId: ObjectId): Promise<Menu[]> {
-  return collections.menus.find({ ownerId }).sort({ createdAt: -1 }).toArray();
+  return collections.menus.find({ ownerId }).sort({ createdAt: -1, _id: -1 }).toArray();
 }
 
 export function findMenuBySlug({ collections }: MenuDeps, slug: string): Promise<Menu | null> {
