@@ -1,0 +1,76 @@
+:root {
+  /* Forest green theme */
+  --ink: #1c2421;
+  --muted: #56635d;
+  --line: #d5ded8;
+  --accent: #2f6b4f;
+  --accent-hover: #24543e;
+  --accent-ink: #fff;
+  --bg: #f5f7f4;
+  --card: #fff;
+  --danger: #b42318;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.5; }
+main { max-width: 880px; margin: 0 auto; padding: 24px 16px 64px; }
+a { color: var(--accent); }
+h1 { line-height: 1.2; }
+
+.site-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  max-width: 880px; margin: 0 auto; padding: 16px;
+}
+.site-header nav { display: flex; align-items: center; gap: 16px; }
+.brand { font-weight: 700; font-size: 1.25rem; text-decoration: none; color: var(--ink); }
+
+.hero { padding: 48px 0; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3rem); margin: 0 0 16px; }
+.hero p { font-size: 1.125rem; color: var(--muted); max-width: 40em; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 16px 0; }
+.narrow { max-width: 420px; margin: 32px auto; }
+
+form { display: grid; gap: 12px; }
+form.inline, form.row { display: inline-flex; align-items: end; gap: 8px; flex-wrap: wrap; }
+label { display: grid; gap: 4px; font-weight: 600; }
+input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+input[type='file'] { padding: 6px; }
+
+button, .button {
+  font: inherit; font-weight: 600; cursor: pointer; display: inline-block; text-decoration: none;
+  padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-ink);
+}
+button:not(.link):not(.danger):hover, .button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+button.link:hover { text-decoration: underline; }
+button.danger:hover { background: #fef3f2; }
+button:focus-visible, .button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 2px;
+}
+button.link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 400; }
+button.danger { background: none; color: var(--danger); border-color: var(--danger); }
+form button { justify-self: start; }
+
+.hint { margin: 0; color: var(--muted); font-size: 0.875rem; }
+.error { color: var(--danger); background: #fef3f2; border: 1px solid #fecdca; border-radius: 8px; padding: 8px 12px; }
+
+.menus { list-style: none; padding: 0; }
+.menu { display: flex; gap: 20px; align-items: start; }
+.menu h2 { margin: 0 0 4px; }
+.menu p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.menu form { margin-top: 12px; }
+.qr { flex: none; background: #fff; }
+
+/* Public menu page: full-width, no site chrome. */
+body.bare main { max-width: 1200px; padding: 0; }
+.menu-title { text-align: center; margin: 16px; font-size: 1.25rem; }
+#menu canvas { display: block; width: 100%; height: auto; }
+.loading { text-align: center; color: var(--muted); }
+
+@media (max-width: 560px) {
+  .menu { flex-direction: column; }
+}
