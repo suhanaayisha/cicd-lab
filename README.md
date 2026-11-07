@@ -1,10 +1,12 @@
 # MenuQR: restaurant menus as QR codes
 
-[![CI](https://github.com/suhanaayisha/cicd-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/suhanaayisha/cicd-lab/actions/workflows/ci.yml)
+[![CI](https://github.com/suhanaayisha/menuqr-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/suhanaayisha/menuqr-generator/actions/workflows/ci.yml)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
 ![React 19](https://img.shields.io/badge/React-19-149eca)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![MongoDB 8](https://img.shields.io/badge/MongoDB-8-47a248)
+
+**Live demo: [menuqr-hwlp.onrender.com](https://menuqr-hwlp.onrender.com)** (free hosting, so the first visit may take up to a minute while it wakes up)
 
 MenuQR turns a restaurant's PDF menu into a mobile-friendly web page and a printable QR code. Restaurants sign up and upload their menu, then put the QR code on their tables. Guests scan it and the menu opens on their phone, with no app and no PDF viewer needed.
 
@@ -121,7 +123,7 @@ The Render service is defined as code in a Render Blueprint:
 
 ### Proving the guardrails work
 
-The pipeline was tested by breaking it on purpose. In [PR #2](https://github.com/suhanaayisha/cicd-lab/pull/2) I pushed a deliberately failing test to confirm CI goes red and blocks the change, then reverted it in [PR #3](https://github.com/suhanaayisha/cicd-lab/pull/3). Every change since has gone through a feature branch and a pull request.
+The pipeline was tested by breaking it on purpose. In [PR #2](https://github.com/suhanaayisha/menuqr-generator/pull/2) I pushed a deliberately failing test to confirm CI goes red and blocks the change, then reverted it in [PR #3](https://github.com/suhanaayisha/menuqr-generator/pull/3). Every change since has gone through a feature branch and a pull request.
 
 ---
 
@@ -220,8 +222,8 @@ Design decisions:
 **Requirements:** Node.js 24, npm and Docker.
 
 ```bash
-git clone https://github.com/suhanaayisha/cicd-lab.git
-cd cicd-lab
+git clone https://github.com/suhanaayisha/menuqr-generator.git
+cd menuqr-generator
 npm ci
 cp .env.example .env
 npm run db:start        # MongoDB 8 in Docker on port 27017
@@ -296,6 +298,8 @@ Everything runs on free tiers: **Render** (web service), **MongoDB Atlas** (M0 c
 5. **Custom domain (optional):** add it in Render and set `PUBLIC_URL` so QR codes use it.
 
 From then on, merging a pull request into `main` triggers CI, and Render deploys automatically once CI passes.
+
+The live instance runs at **[menuqr-hwlp.onrender.com](https://menuqr-hwlp.onrender.com)**.
 
 > On Render's free plan the service sleeps after a period of inactivity, so the first request afterwards takes about a minute to start it. For a restaurant using it for real, the paid "Starter" plan keeps it always on.
 

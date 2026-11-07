@@ -33,4 +33,4 @@ services:
       - key: R2_BUCKET
         value: menuqr-menus
       # Optional: set PUBLIC_URL in the dashboard once you add a custom domain.
-      # Without it, QR codes use the address the app is reached at (https://menuqr.onrender.com).
+      # Without it, QR codes use the address the app is reached at (e.g. https://menuqr-hwlp.onrender.com).
