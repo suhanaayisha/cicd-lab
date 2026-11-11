@@ -4,6 +4,8 @@ import { getConfig } from './config';
 export interface User {
   _id: ObjectId;
   email: string;
+  /** Lowercase; see USERNAME_PATTERN in lib/auth.ts. Optional because older accounts may not have one. */
+  username?: string;
   passwordHash: string;
   createdAt: Date;
 }
@@ -43,6 +45,11 @@ export function collectionsFor(db: Db): Collections {
 export async function ensureIndexes(collections: Collections): Promise<void> {
   await Promise.all([
     collections.users.createIndex({ email: 1 }, { unique: true }),
+    // Unique among accounts that have a username; older accounts without one are skipped.
+    collections.users.createIndex(
+      { username: 1 },
+      { unique: true, partialFilterExpression: { username: { $type: 'string' } } },
+    ),
     // MongoDB deletes sessions automatically once expiresAt passes.
     collections.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     collections.menus.createIndex({ slug: 1 }, { unique: true }),
@@ -74,4 +81,10 @@ export function getCollections(): Promise<Collections> {
 
 export function isDuplicateKeyError(error: unknown): boolean {
   return error instanceof MongoServerError && error.code === 11000;
+}
+
+/** Which unique field a duplicate key error was about, e.g. 'email' or 'username'. */
+export function duplicateKeyField(error: unknown): string | undefined {
+  if (!isDuplicateKeyError(error)) return undefined;
+  return Object.keys((error as MongoServerError).keyPattern ?? {})[0];
 }

@@ -36,6 +36,7 @@ after(async () => {
 
 let counter = 0;
 const uniqueEmail = () => `user${++counter}@example.com`;
+const uniqueUsername = () => `user${++counter}`;
 
 describe('config', () => {
   test('requires all R2 settings when STORAGE_DRIVER=r2', () => {
@@ -53,7 +54,7 @@ describe('config', () => {
 
 describe('accounts', () => {
   test('sign up stores a hashed password, never the plain text', async () => {
-    const result = await signUp(collections, { email: uniqueEmail(), password: 'correct horse battery', confirmPassword: 'correct horse battery' });
+    const result = await signUp(collections, { email: uniqueEmail(), username: uniqueUsername(), password: 'correct horse battery', confirmPassword: 'correct horse battery' });
     assert.ok(result.ok);
     const user = await collections.users.findOne({ _id: result.user._id });
     assert.match(user!.passwordHash, /^scrypt\$/);
@@ -61,36 +62,69 @@ describe('accounts', () => {
   });
 
   test('rejects invalid emails, short passwords and duplicate accounts', async () => {
-    assert.deepEqual(await signUp(collections, { email: 'not-an-email', password: 'long enough', confirmPassword: 'long enough' }), {
+    assert.deepEqual(await signUp(collections, { email: 'not-an-email', username: uniqueUsername(), password: 'long enough', confirmPassword: 'long enough' }), {
       ok: false,
       error: 'Enter a valid email address.',
     });
-    assert.equal((await signUp(collections, { email: uniqueEmail(), password: 'short', confirmPassword: 'short' })).ok, false);
+    assert.equal((await signUp(collections, { email: uniqueEmail(), username: uniqueUsername(), password: 'short', confirmPassword: 'short' })).ok, false);
 
     const email = uniqueEmail();
-    assert.ok((await signUp(collections, { email, password: 'first password', confirmPassword: 'first password' })).ok);
-    const duplicate = await signUp(collections, { email: email.toUpperCase(), password: 'second password', confirmPassword: 'second password' });
+    assert.ok((await signUp(collections, { email, username: uniqueUsername(), password: 'first password', confirmPassword: 'first password' })).ok);
+    const duplicate = await signUp(collections, { email: email.toUpperCase(), username: uniqueUsername(), password: 'second password', confirmPassword: 'second password' });
     assert.equal(duplicate.ok, false);
   });
 
   test('rejects sign-up when the passwords do not match', async () => {
     const email = uniqueEmail();
-    const result = await signUp(collections, { email, password: 'correct horse battery', confirmPassword: 'correct horse batery' });
+    const result = await signUp(collections, { email, username: uniqueUsername(), password: 'correct horse battery', confirmPassword: 'correct horse batery' });
     assert.deepEqual(result, { ok: false, error: 'Passwords do not match.' });
     assert.equal(await collections.users.countDocuments({ email }), 0);
   });
 
   test('log in checks the password and ignores email case', async () => {
     const email = uniqueEmail();
-    await signUp(collections, { email, password: 'correct horse battery', confirmPassword: 'correct horse battery' });
+    await signUp(collections, { email, username: uniqueUsername(), password: 'correct horse battery', confirmPassword: 'correct horse battery' });
 
-    assert.equal((await logIn(collections, { email, password: 'wrong password' })).ok, false);
-    assert.equal((await logIn(collections, { email: 'nobody@example.com', password: 'x' })).ok, false);
-    assert.ok((await logIn(collections, { email: ` ${email.toUpperCase()} `, password: 'correct horse battery' })).ok);
+    assert.equal((await logIn(collections, { login: email, password: 'wrong password' })).ok, false);
+    assert.equal((await logIn(collections, { login: 'nobody@example.com', password: 'x' })).ok, false);
+    assert.ok((await logIn(collections, { login: ` ${email.toUpperCase()} `, password: 'correct horse battery' })).ok);
+  });
+
+  test('log in also works with the username, ignoring case', async () => {
+    const username = uniqueUsername();
+    await signUp(collections, { email: uniqueEmail(), username, password: 'correct horse battery', confirmPassword: 'correct horse battery' });
+
+    assert.ok((await logIn(collections, { login: ` ${username.toUpperCase()} `, password: 'correct horse battery' })).ok);
+    assert.equal((await logIn(collections, { login: username, password: 'wrong password' })).ok, false);
+    assert.equal((await logIn(collections, { login: 'nobody', password: 'x' })).ok, false);
+    assert.equal((await logIn(collections, { login: '', password: 'x' })).ok, false);
+  });
+
+  test('usernames are stored in lowercase, validated and unique', async () => {
+    const username = uniqueUsername();
+    const result = await signUp(collections, { email: uniqueEmail(), username: username.toUpperCase(), password: 'long enough', confirmPassword: 'long enough' });
+    assert.ok(result.ok);
+    assert.equal(result.user.username, username);
+
+    const duplicate = await signUp(collections, { email: uniqueEmail(), username, password: 'long enough', confirmPassword: 'long enough' });
+    assert.deepEqual(duplicate, { ok: false, error: 'That username is taken. Please choose another.' });
+
+    for (const bad of ['ab', 'has space', 'me@example.com', 'x'.repeat(31)]) {
+      const invalid = await signUp(collections, { email: uniqueEmail(), username: bad, password: 'long enough', confirmPassword: 'long enough' });
+      assert.equal(invalid.ok, false, `${bad} should be rejected`);
+    }
+  });
+
+  test('accounts without a username can still sign up alongside others', async () => {
+    // Older accounts have no username field; the unique index must ignore them.
+    await collections.users.insertMany([
+      { _id: new ObjectId(), email: uniqueEmail(), passwordHash: 'x', createdAt: new Date() },
+      { _id: new ObjectId(), email: uniqueEmail(), passwordHash: 'x', createdAt: new Date() },
+    ]);
   });
 
   test('sessions resolve to their user until deleted or expired', async () => {
-    const result = await signUp(collections, { email: uniqueEmail(), password: 'correct horse battery', confirmPassword: 'correct horse battery' });
+    const result = await signUp(collections, { email: uniqueEmail(), username: uniqueUsername(), password: 'correct horse battery', confirmPassword: 'correct horse battery' });
     assert.ok(result.ok);
     const { token } = await createSession(collections, result.user._id);
 

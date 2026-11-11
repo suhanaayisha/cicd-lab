@@ -152,15 +152,17 @@ const FORM = { signup: 0, login: 0, logout: 0, upload: 1 } as const;
 let userCounter = 0;
 async function signedInBrowser() {
   const browser = new Browser();
-  const email = `owner${++userCounter}@example.com`;
+  const username = `owner${++userCounter}`;
+  const email = `${username}@example.com`;
   const response = await browser.submit('/signup', FORM.signup, {
     email,
+    username,
     password: 'correct horse battery',
     confirmPassword: 'correct horse battery',
   });
   assert.equal(response.status, 303, `sign up should redirect\n${serverLog}`);
   assert.equal(response.headers.get('location'), '/dashboard');
-  return { browser, email };
+  return { browser, email, username };
 }
 
 async function uploadMenu(browser: Browser, name: string, data = pdfBytes(name)) {
@@ -195,7 +197,7 @@ describe('accounts', () => {
   });
 
   test('shows a validation error for short passwords', async () => {
-    const response = await new Browser().submit('/signup', FORM.signup, { email: 'short@example.com', password: 'abc', confirmPassword: 'abc' });
+    const response = await new Browser().submit('/signup', FORM.signup, { email: 'short@example.com', username: 'short', password: 'abc', confirmPassword: 'abc' });
     assert.match(await response.text(), /Password must be 8–200 characters/);
   });
 
@@ -203,6 +205,7 @@ describe('accounts', () => {
     const browser = new Browser();
     const response = await browser.submit('/signup', FORM.signup, {
       email: 'mismatch@example.com',
+      username: 'mismatch',
       password: 'correct horse battery',
       confirmPassword: 'something else',
     });
@@ -212,15 +215,20 @@ describe('accounts', () => {
   });
 
   test('wrong password is rejected; logging out ends the session on the server', async () => {
-    const { browser: first, email } = await signedInBrowser();
+    const { browser: first, email, username } = await signedInBrowser();
     await first.submit('/dashboard', FORM.logout, {});
 
     const browser = new Browser();
-    const wrong = await browser.submit('/login', FORM.login, { email, password: 'wrong password' });
-    assert.match(await wrong.text(), /Incorrect email or password/);
+    const wrong = await browser.submit('/login', FORM.login, { login: email, password: 'wrong password' });
+    const wrongHtml = await wrong.text();
+    assert.match(wrongHtml, /Incorrect email, username or password/);
+    assert.match(wrongHtml, new RegExp(`value="${email}"`), 'the login field keeps what was typed');
     assert.equal(browser.cookies.has('sid'), false);
 
-    const right = await browser.submit('/login', FORM.login, { email, password: 'correct horse battery' });
+    const byUsername = await new Browser().submit('/login', FORM.login, { login: username, password: 'correct horse battery' });
+    assert.equal(byUsername.status, 303, 'logging in with the username works too');
+
+    const right = await browser.submit('/login', FORM.login, { login: email, password: 'correct horse battery' });
     assert.equal(right.status, 303);
     const copiedCookie = browser.cookies.get('sid')!;
 
@@ -236,6 +244,20 @@ describe('accounts', () => {
     assert.equal(response.headers.get('location'), '/login');
   });
 
+  test('shows an error when the username is taken', async () => {
+    const { username } = await signedInBrowser();
+    const response = await new Browser().submit('/signup', FORM.signup, {
+      email: 'someone-else@example.com',
+      username,
+      password: 'correct horse battery',
+      confirmPassword: 'correct horse battery',
+    });
+    const html = await response.text();
+    assert.match(html, /That username is taken/);
+    assert.match(html, /value="someone-else@example.com"/, 'the email field keeps what was typed');
+    assert.equal(await db.collections.users.countDocuments({ email: 'someone-else@example.com' }), 0);
+  });
+
   test('the dashboard requires login', async () => {
     const response = await new Browser().get('/dashboard');
     assert.equal(response.status, 307);
@@ -246,7 +268,7 @@ describe('accounts', () => {
     const response = await new Browser().submit(
       '/login',
       FORM.login,
-      { email: 'a@example.com', password: 'whatever' },
+      { login: 'a@example.com', password: 'whatever' },
       { origin: 'https://evil.example' },
     );
     assert.ok(response.status >= 400, `expected a rejection, got ${response.status}`);

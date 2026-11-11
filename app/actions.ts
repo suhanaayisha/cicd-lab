@@ -11,7 +11,8 @@ import { createMenu, deleteMenu, replaceMenuPdf } from '@/lib/menus';
 import { getStore } from '@/lib/storage';
 import { endSession, requireUser, startSession } from './_lib/session';
 
-export type FormState = { error?: string; email?: string } | undefined;
+/** `values` refills the text fields after an error, so people don't retype them. Never includes passwords. */
+export type FormState = { error?: string; values?: Record<string, string> } | undefined;
 
 function text(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -29,21 +30,21 @@ async function deps() {
 }
 
 export async function signUpAction(_state: FormState, formData: FormData): Promise<FormState> {
-  const email = text(formData, 'email');
+  const values = { email: text(formData, 'email'), username: text(formData, 'username') };
   const result = await signUp(await getCollections(), {
-    email,
+    ...values,
     password: text(formData, 'password'),
     confirmPassword: text(formData, 'confirmPassword'),
   });
-  if (!result.ok) return { error: result.error, email };
+  if (!result.ok) return { error: result.error, values };
   await startSession(result.user);
   redirect('/dashboard');
 }
 
 export async function logInAction(_state: FormState, formData: FormData): Promise<FormState> {
-  const email = text(formData, 'email');
-  const result = await logIn(await getCollections(), { email, password: text(formData, 'password') });
-  if (!result.ok) return { error: result.error, email };
+  const login = text(formData, 'login');
+  const result = await logIn(await getCollections(), { login, password: text(formData, 'password') });
+  if (!result.ok) return { error: result.error, values: { login } };
   await startSession(result.user);
   redirect('/dashboard');
 }
