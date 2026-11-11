@@ -264,11 +264,12 @@ describe('menus', () => {
 
     // Guests (not signed in) can open everything.
     const guest = new Browser();
+    // The QR link sends guests straight to the PDF.
     const page = await guest.get(`/m/${menu.slug}`);
-    assert.equal(page.status, 200);
-    const html = await page.text();
-    assert.match(html, /River Café/);
-    assert.match(html, new RegExp(`/m/${menu.slug}/menu.pdf\\?v=${menu.updatedAt.getTime()}`));
+    assert.equal(page.status, 302);
+    assert.equal(page.headers.get('location'), `/m/${menu.slug}/menu.pdf?v=${menu.updatedAt.getTime()}`);
+    assert.equal(page.headers.get('cache-control'), 'no-store');
+    await page.body?.cancel();
 
     const versioned = await guest.get(`/m/${menu.slug}/menu.pdf?v=${menu.updatedAt.getTime()}`);
     assert.equal(versioned.headers.get('content-type'), 'application/pdf');
@@ -305,8 +306,8 @@ describe('menus', () => {
 
   test('React escapes menu names', async () => {
     const { browser } = await signedInBrowser();
-    const menu = await uploadMenu(browser, '<script>alert(1)</script>');
-    const html = await (await new Browser().get(`/m/${menu.slug}`)).text();
+    await uploadMenu(browser, '<script>alert(1)</script>');
+    const html = await (await browser.get('/dashboard')).text();
     assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
     assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   });
