@@ -62,14 +62,14 @@ flowchart LR
     C -- prints --> QR[QR code on table]
     subgraph Guest
       QR -- scans --> P["/m/escape-cafe"]
-      P --> V[PDF.js renders the menu<br/>in the browser]
+      P -- redirect --> V[Phone opens the PDF<br/>in its own viewer]
     end
     R2 -. PDF .-> V
 ```
 
 1. **Upload:** the restaurant names the menu and uploads a PDF. The server checks it really is a PDF (by its contents, not its file name), stores it in Cloudflare R2, and saves the menu record in MongoDB with a unique link. If the name is taken, the link gets `-2`, `-3` and so on.
 2. **Share:** the dashboard shows the link and a QR code that encodes it.
-3. **View:** the guest's phone loads the menu page. A React component uses **PDF.js** to draw each page at the phone's screen width and pixel density, so the text is sharp.
+3. **View:** the QR link redirects straight to the PDF, so the guest's phone opens it in its built-in viewer (pinch-to-zoom, no extra page in between).
 4. **Update:** a new PDF replaces the old one behind the same link. The PDF's URL includes a version number, so browsers fetch the new menu straight away and cache it until the next change.
 
 ---
@@ -143,12 +143,12 @@ Calls the framework-free code in `lib/` directly:
 
 Starts the **real production build** (`next start`) on a free port, with a throwaway database and a temporary upload folder, then uses it like a browser:
 - It submits the **actual Server Action forms** by reading the hidden action fields from the server-rendered HTML. Next.js forms work without JavaScript, so this tests the real sign-up, login, upload, replace and delete code paths.
-- Full journey: sign up → upload → public menu page → exact PDF bytes and cache headers → QR code encoding the correct public URL → replace → delete → 404.
+- Full journey: sign up → upload → QR link redirects to the PDF → exact PDF bytes and cache headers → QR code encoding the correct public URL → replace → delete → 404.
 - Security: a copied session cookie stops working after logout, cross-site form posts are blocked, the dashboard requires login, and a `<script>` in a menu name is escaped.
 
 ### Manual browser checks
 
-The PDF.js viewer and responsive layout were also checked in real Chrome (driven through the DevTools protocol) at desktop and phone sizes.
+The responsive layout was also checked in real Chrome (driven through the DevTools protocol) at desktop and phone sizes.
 
 ---
 
@@ -161,12 +161,12 @@ app/                         Next.js App Router: UI and HTTP layer
 │   ├── signup/ login/       Auth pages
 │   └── dashboard/           Upload, replace, delete; QR downloads
 ├── m/[slug]/                Public guest pages (no site header)
-│   ├── page.tsx             Menu page → <MenuViewer>
+│   ├── route.ts             Redirects to the current PDF version
 │   ├── menu.pdf/route.ts    Streams the PDF with cache headers
 │   └── qr/route.ts          SVG QR code (?download=1 to save)
 ├── api/health, api/version  Health check and deployed version
 ├── actions.ts               Server Actions: thin wrappers around lib/
-├── _components/             React: forms (pending states, inline errors), MenuViewer (PDF.js)
+├── _components/             React: forms (pending states, inline errors)
 └── _lib/                    Session cookies, public URL from proxy headers
 lib/                         Business logic: plain TypeScript, no Next.js imports
 ├── auth.ts                  Password hashing, sign-up/login rules, sessions
@@ -181,7 +181,6 @@ Design decisions:
 - **Business rules live in `lib/` and know nothing about Next.js.** Pages and Server Actions only read the request and call `lib/`. The rules are easy to test, and ownership checks can't be skipped by calling a different route.
 - **Pluggable storage:** the `FileStore` interface has three implementations: Cloudflare R2 in production, a local folder in development and in-memory in tests. Switching is one environment variable.
 - **Progressive enhancement:** forms are server-rendered and work without JavaScript. When it's available, React adds pending states ("Uploading…"), inline errors and instant checks such as file size and password confirmation.
-- **PDF.js is loaded only on menu pages**, in the browser, so the dashboard and landing pages stay light.
 - **One database connection pool** is reused across requests and hot reloads.
 
 ---
@@ -209,7 +208,7 @@ Design decisions:
 | Language | TypeScript 7 (strict), Node.js 24 |
 | Database | MongoDB 8: Atlas in production, Docker locally and in CI |
 | File storage | Cloudflare R2 through the AWS S3 SDK |
-| PDF rendering | PDF.js (in the browser) |
+| PDF viewing | The guest's own browser / phone PDF viewer |
 | QR codes | `qrcode` (SVG output) |
 | Testing | `node:test` + `tsx`; end-to-end against the production build |
 | CI | GitHub Actions with a MongoDB service container |
@@ -277,7 +276,7 @@ All settings come from environment variables (`.env` locally, Render's dashboard
 | `/` | Public | Landing page |
 | `/signup`, `/login` | Public | Create an account, log in |
 | `/dashboard` | Signed in | Upload, replace and delete menus; download QR codes |
-| `/m/:slug` | Public | Menu page for guests |
+| `/m/:slug` | Public | QR target: redirects to the current menu PDF |
 | `/m/:slug/menu.pdf` | Public | The PDF (cached for a year when requested with its `?v=` version) |
 | `/m/:slug/qr` | Public | SVG QR code; `?download=1` saves it as a file |
 | `/api/health` | Public | `{"status":"ok"}` for Render's health check |

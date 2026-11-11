@@ -72,10 +72,6 @@ form button { justify-self: start; }
 .qr { flex: none; background: #fff; }
 
 /* Public menu page: full-width, no site chrome. */
-main.menu-page { max-width: 1200px; padding: 0; }
-.menu-title { text-align: center; margin: 16px; font-size: 1.25rem; }
-#menu canvas { display: block; width: 100%; height: auto; }
-.loading { text-align: center; color: var(--muted); }
 
 @media (max-width: 560px) {
   .menu { flex-direction: column; }
