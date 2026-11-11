@@ -36,7 +36,7 @@ It's a full-stack **Next.js 16** app (React 19, App Router, Server Actions) writ
 ## Features
 
 **For restaurants**
-- Create an account with email, password and password confirmation.
+- Create an account with email, a unique username, password and password confirmation; log in with either the email or the username.
 - Upload a menu PDF (up to 25 MB) and get a unique, readable link such as `/m/escape-cafe`.
 - Download a QR code as an SVG, which prints sharply at any size on table cards, posters or windows.
 - Replace the PDF at any time. **The link and QR code never change**, so printed QR codes keep working.
@@ -135,7 +135,7 @@ The pipeline was tested by breaking it on purpose. In [PR #2](https://github.com
 
 Calls the framework-free code in `lib/` directly:
 - **Config:** R2 settings are required when `STORAGE_DRIVER=r2`, unknown drivers are rejected, and the version falls back to the Render commit.
-- **Accounts:** passwords are stored hashed (never in plain text), invalid emails, short passwords, mismatched confirmations and duplicate accounts are rejected, and login ignores email case.
+- **Accounts:** passwords are stored hashed (never in plain text), invalid emails, short passwords, mismatched confirmations and duplicate emails and taken usernames are rejected, and login works with either the email or the username, ignoring case.
 - **Sessions:** sessions resolve to the right user, raw tokens are never stored, and deleted or expired sessions stop working.
 - **Menus:** URL-safe unique links, PDF signature and size validation (rejected uploads leave no files behind), replace keeps the link and deletes the old file, delete cleans up storage, **one user cannot change or delete another user's menu**, and listing is per owner, newest first.
 

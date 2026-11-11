@@ -68,10 +68,43 @@ export function AuthForm({ mode }: { mode: 'signup' | 'login' }) {
       <h1>{isSignup ? 'Create your account' : 'Log in'}</h1>
       <ErrorMessage error={state?.error} />
       <form action={action}>
-        <label>
-          Email
-          <input type="email" name="email" required autoComplete="email" defaultValue={state?.email} />
-        </label>
+        {isSignup ? (
+          <>
+            <label>
+              Email
+              <input type="email" name="email" required autoComplete="email" defaultValue={state?.values?.email} />
+            </label>
+            <label>
+              Username
+              <input
+                type="text"
+                name="username"
+                required
+                minLength={3}
+                maxLength={30}
+                pattern="[A-Za-z0-9._\-]{3,30}"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                defaultValue={state?.values?.username}
+              />
+            </label>
+            <p className="hint">3–30 letters, numbers, dots, dashes or underscores. You can log in with it.</p>
+          </>
+        ) : (
+          <label>
+            Email or username
+            <input
+              type="text"
+              name="login"
+              required
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              defaultValue={state?.values?.login}
+            />
+          </label>
+        )}
         <label>
           Password
           <input

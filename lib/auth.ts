@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { promisify } from 'node:util';
 import { ObjectId } from 'mongodb';
-import { isDuplicateKeyError, type Collections, type User } from './db';
+import { duplicateKeyField, type Collections, type User } from './db';
 
 const scrypt = promisify(crypto.scrypt) as (
   password: string,
@@ -13,6 +13,8 @@ const KEY_LENGTH = 64;
 export const SESSION_COOKIE = 'sid';
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** 3–30 lowercase letters, numbers, dots, dashes or underscores. No "@", so it can never look like an email. */
+export const USERNAME_PATTERN = /^[a-z0-9._-]{3,30}$/;
 
 export type AuthResult = { ok: true; user: User } | { ok: false; error: string };
 
@@ -39,13 +41,21 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+export function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase();
+}
+
 export async function signUp(
   collections: Collections,
-  input: { email: string; password: string; confirmPassword: string },
+  input: { email: string; username: string; password: string; confirmPassword: string },
 ): Promise<AuthResult> {
   const email = normalizeEmail(input.email);
   if (!EMAIL_PATTERN.test(email) || email.length > 254) {
     return { ok: false, error: 'Enter a valid email address.' };
+  }
+  const username = normalizeUsername(input.username);
+  if (!USERNAME_PATTERN.test(username)) {
+    return { ok: false, error: 'Username must be 3–30 characters: letters, numbers, dots, dashes or underscores.' };
   }
   if (input.password.length < 8 || input.password.length > 200) {
     return { ok: false, error: 'Password must be 8–200 characters.' };
@@ -57,15 +67,17 @@ export async function signUp(
   const user: User = {
     _id: new ObjectId(),
     email,
+    username,
     passwordHash: await hashPassword(input.password),
     createdAt: new Date(),
   };
   try {
     await collections.users.insertOne(user);
   } catch (error) {
-    if (isDuplicateKeyError(error)) {
-      return { ok: false, error: 'An account with this email already exists. Try logging in.' };
-    }
+    // The unique indexes are the real check, so two sign-ups at the same moment can't both win.
+    const field = duplicateKeyField(error);
+    if (field === 'email') return { ok: false, error: 'An account with this email already exists. Try logging in.' };
+    if (field === 'username') return { ok: false, error: 'That username is taken. Please choose another.' };
     throw error;
   }
   return { ok: true, user };
@@ -73,11 +85,15 @@ export async function signUp(
 
 export async function logIn(
   collections: Collections,
-  input: { email: string; password: string },
+  input: { login: string; password: string },
 ): Promise<AuthResult> {
-  const user = await collections.users.findOne({ email: normalizeEmail(input.email) });
+  // Usernames can't contain "@", so an "@" means the person typed their email.
+  const login = input.login.trim().toLowerCase();
+  const user = login
+    ? await collections.users.findOne(login.includes('@') ? { email: login } : { username: login })
+    : null;
   if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
-    return { ok: false, error: 'Incorrect email or password.' };
+    return { ok: false, error: 'Incorrect email, username or password.' };
   }
   return { ok: true, user };
 }
